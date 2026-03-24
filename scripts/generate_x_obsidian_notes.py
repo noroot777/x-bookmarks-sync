@@ -44,6 +44,17 @@ MONTHS = {
     "Dec": 12,
 }
 
+LOW_SIGNAL_PREFIXES = (
+    "最近在 github 上",
+    "今天在 github 上",
+    "偶然看到",
+    "不妨安装一下",
+    "推荐一个开源项目",
+    "我发现",
+    "我又来",
+    "给出一个非常巧妙的解决方案",
+)
+
 TAG_RULES = [
     (("skill", "skills", "技能"), "skills"),
     (("agent", "agents", "智能体", "代理"), "agents"),
@@ -134,6 +145,174 @@ def parse_status_datetime(status_id: str) -> datetime | None:
     return datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc).astimezone(LOCAL_TZ)
 
 
+def normalize_spaces(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def compact_text(text: str) -> str:
+    return normalize_spaces(
+        text.replace("：", ": ")
+        .replace("（", " (")
+        .replace("）", ") ")
+        .replace("，", ", ")
+    )
+
+
+def sentence_chunks(text: str):
+    raw = compact_text(text)
+    if not raw:
+        return []
+    parts = re.split(r"[。！？!?]\s*|\n+", raw)
+    return [part.strip(" -:：,.，") for part in parts if part.strip(" -:：,.，")]
+
+
+def strip_filler(text: str) -> str:
+    candidate = normalize_spaces(text)
+    patterns = [
+        r"^(最近|今天|偶然)(在\s*GitHub\s*上)?(看到|发现)(了|到)?",
+        r"^不妨安装一下",
+        r"^推荐一个开源项目[:：]?",
+        r"^如果你用的 API，或者想连接飞书之类的话，可以用我的 skill[:：]?",
+        r"^每次满心欢喜地提交 iOS 应用审核，最怕因为一些配置小疏忽被苹果无情打回，反复修改白白浪费几天时间",
+    ]
+    for pattern in patterns:
+        candidate = re.sub(pattern, "", candidate, flags=re.IGNORECASE).strip(" -:：,.，")
+    return candidate or normalize_spaces(text)
+
+
+def article_title_line(item):
+    raw_lines = [line.strip() for line in item.get("lines", []) if line.strip()]
+    for idx, line in enumerate(raw_lines):
+        if line == "Article" and idx + 1 < len(raw_lines):
+            return raw_lines[idx + 1].strip()
+    return ""
+
+
+def extract_project_name(item):
+    text = item.get("text", "")
+    lines = item.get("lines", [])
+    author = item.get("author", "").strip()
+    handle = item.get("handle", "").strip().lstrip("@")
+    candidates = []
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("@") or line == author or line == handle or is_time_label(line):
+            continue
+        candidates.append(line)
+    candidates.append(text)
+
+    patterns = [
+        r"\b([A-Z][A-Za-z0-9_.+\-]{1,40})\s+这个开源项目",
+        r"\b([A-Z][A-Za-z0-9_.+\-]{1,40})\s+这个 Skill",
+        r"\b([A-Z][A-Za-z0-9_.+\-]{1,40})\s+这个技能",
+        r"\b([A-Z][A-Za-z0-9_.+\-]{1,40})\s+这个项目",
+        r"\b(OpenClaw x Mem9)\b",
+        r"\b(App Store Preflight)\b",
+        r"\b(SkillDeck)\b",
+        r"\b(HyperAgent)\b",
+        r"\b(bb-browser)\b",
+        r"\b([A-Z][A-Za-z0-9_.+\-]{2,40}[A-Z][A-Za-z0-9_.+\-]*)\b",
+        r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,4})\b",
+    ]
+
+    for text_value in candidates:
+        compact = compact_text(text_value)
+        for pattern in patterns:
+            match = re.search(pattern, compact)
+            if not match:
+                continue
+            name = normalize_spaces(match.group(1))
+            if len(name) < 2:
+                continue
+            if name.lower() in {"article", "show", "github", "gitdaily", "githubdaily", "mar"}:
+                continue
+            if name in {author, handle}:
+                continue
+            return name
+    return ""
+
+
+def synthesize_title_from_keywords(item, project_name: str):
+    text = compact_text(item.get("text", ""))
+    if not project_name:
+        return ""
+
+    keyword_rules = [
+        (("playwright", "选择器"), f"{project_name}: 用大模型增强 Playwright, 减少选择器维护"),
+        (("xcode", "审核"), f"{project_name}: 提交审核前自动预检 iOS 应用"),
+        (("技能管理", "skill管理", "skills 管理"), f"{project_name}: 可视化 Skills 管理客户端"),
+        (("登录状态", "浏览器"), f"{project_name}: 复用登录态做网页自动化"),
+        (("长期记忆", "失忆", "mem9"), f"{project_name}: 给多 Agent 协作加长期记忆"),
+        (("飞书", "discord", "远程控制"), f"{project_name}: 连接飞书与 Discord 的远程控制方案"),
+        (("桌面客户端", "主流工具"), f"{project_name}: 多 AI 工具通用的 Skills 管理客户端"),
+        (("装这些", "新 mac"), f"{project_name}: 新 Mac 装机软件清单与配置思路"),
+    ]
+    lower = text.lower()
+    for keywords, title in keyword_rules:
+        if all(keyword.lower() in lower for keyword in keywords):
+            return title
+    return ""
+
+
+def cleaned_content_candidates(item):
+    lines = content_lines(item.get("lines", []))
+    author = item.get("author", "").strip()
+    filtered = [line for line in lines if line != author]
+    return [strip_filler(line) for line in filtered if strip_filler(line)]
+
+
+def build_default_summary(item, title):
+    candidates = cleaned_content_candidates(item)
+    project_name = extract_project_name(item)
+    summary_parts = []
+
+    lower_text = compact_text(item.get("text", "")).lower()
+    if project_name:
+        if "playwright" in lower_text and "选择器" in lower_text:
+            summary_parts = [
+                "传统 Playwright 自动化经常因为页面结构微调而失效，维护成本高。",
+                f"{project_name} 把浏览器自动化和模型结合起来，降低对固定选择器的依赖。",
+                "适合自动化测试和爬虫场景里需要更强页面适应性的需求。",
+            ]
+        elif "xcode" in lower_text and "审核" in lower_text:
+            summary_parts = [
+                f"{project_name} 面向 iOS 上架前的预审检查，帮助减少因配置疏忽导致的拒审。",
+                "它会扫描 Xcode 项目、源代码和元数据，提前发现常见违规项。",
+                "核心价值是把审核风险前移，避免来回修改浪费时间。",
+            ]
+        elif "登录状态" in lower_text and "浏览器" in lower_text:
+            summary_parts = [
+                "这个项目针对需要登录的网站自动化与资料采集提供了解法。",
+                f"{project_name} 的关键思路是复用用户当前浏览器和现有登录状态。",
+                "这样可以减少额外认证和反爬阻碍，适合需要真实会话的网站操作。",
+            ]
+        elif "长期记忆" in lower_text or "mem9" in lower_text:
+            summary_parts = [
+                "这篇内容围绕多 Agent 协作体系如何接入长期记忆展开。",
+                f"{project_name} 这一组合的重点是让多 Agent 在长期任务中保留上下文与历史。",
+                "适合关注 Agent 记忆层、协作流和长期任务连续性的人参考。",
+            ]
+        elif "技能管理" in lower_text or "skill管理" in lower_text:
+            summary_parts = [
+                f"这条内容介绍了 {project_name} 相关的 Skills 管理工具或客户端。",
+                "重点价值在于把 Skills 的查看、管理和安装流程做得更直观。",
+                "适合需要在本地统一管理多组 Skills 的用户参考。",
+            ]
+
+    if not summary_parts:
+        for line in candidates:
+            if line == title or line in summary_parts:
+                continue
+            if len(summary_parts) >= 3:
+                break
+            summary_parts.append(line)
+
+    if not summary_parts:
+        summary_parts = ["这条书签主要指向外部资源，核心信息请看来源链接和原文摘录。"]
+
+    return summary_parts[:3]
+
+
 def content_lines(lines):
     out = []
     skip_values = {
@@ -188,9 +367,18 @@ def derive_title(item, overrides=None):
     if custom_title:
         return custom_title
 
+    article_title = article_title_line(item)
+    if article_title:
+        return article_title
+
+    project_name = extract_project_name(item)
+    synthesized = synthesize_title_from_keywords(item, project_name)
+    if synthesized:
+        return synthesized
+
     lines = content_lines(item.get("lines", []))
     author = item.get("author", "").strip()
-    filtered = [line for line in lines if line != author]
+    filtered = [strip_filler(line) for line in lines if line != author and strip_filler(line)]
     if not filtered:
         return f"{item.get('handle', '').lstrip('@') or author or 'X Bookmark'} 书签"
     skip_prefixes = {"GitHub：", "Github", "Github地址：", "安装地址：", "浏览查找Youtube ：", "下载Youtube视频和字幕："}
@@ -199,6 +387,8 @@ def derive_title(item, overrides=None):
             continue
         if line == "好消息" and idx + 1 < len(filtered):
             return filtered[idx + 1]
+        if project_name and line != project_name and len(project_name) <= 40 and len(line) <= 42:
+            return f"{project_name}: {line}"
         return line
     return filtered[0]
 
@@ -297,9 +487,9 @@ def derive_summary(item, title, overrides=None):
                 break
 
     if not summary_parts:
-        summary_parts = ["这条书签主要指向外部资源，核心信息请看来源链接和原文摘录。"]
+        summary_parts = build_default_summary(item, title)
 
-    return "\n".join(f"- {part}" for part in summary_parts[:3])
+    return format_summary_lines(summary_parts[:3])
 
 
 def clean_filename(name: str) -> str:
