@@ -1,17 +1,31 @@
 import json
+import os
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 
-SOURCE_JSON = Path("/Users/fjh/.dev-browser/tmp/x-bookmarks-export.json")
-TARGET_DIR = Path("/Users/fjh/obs/foan/origin/X")
+def env_path(name: str, default: str) -> Path:
+    return Path(os.environ.get(name, default)).expanduser()
+
+
+def local_timezone():
+    configured = os.environ.get("X_BOOKMARKS_TIMEZONE", "").strip()
+    if configured:
+        try:
+            return ZoneInfo(configured)
+        except Exception:
+            pass
+    return datetime.now().astimezone().tzinfo or timezone.utc
+
+
+SOURCE_JSON = env_path("X_BOOKMARKS_SOURCE_JSON", "~/.dev-browser/tmp/x-bookmarks-export.json")
+TARGET_DIR = env_path("X_BOOKMARKS_TARGET_DIR", "~/Obsidian/X Bookmarks")
 INDEX_FILE = TARGET_DIR / "000 - X 书签索引.md"
-STATE_FILE = TARGET_DIR / ".x_bookmarks_state.json"
+STATE_FILE = env_path("X_BOOKMARKS_STATE_FILE", str(TARGET_DIR / ".x_bookmarks_state.json"))
 STATE_SEQUENCE_MODE = "bookmark-list-order-v1"
-NOW = datetime(2026, 3, 24, 12, 0, 0)
-LOCAL_TZ = ZoneInfo("Asia/Shanghai")
+LOCAL_TZ = local_timezone()
 TWITTER_EPOCH_MS = 1288834974657
 
 MONTHS = {
@@ -54,23 +68,24 @@ def is_time_label(line: str) -> bool:
 
 
 def parse_date(raw: str) -> str:
+    now = datetime.now(LOCAL_TZ)
     raw = raw.strip()
     if not raw:
         return ""
     if re.fullmatch(r"\d+h", raw):
         hours = int(raw[:-1])
-        return (NOW - timedelta(hours=hours)).date().isoformat()
+        return (now - timedelta(hours=hours)).date().isoformat()
     if re.fullmatch(r"\d+m", raw):
         minutes = int(raw[:-1])
-        return (NOW - timedelta(minutes=minutes)).date().isoformat()
+        return (now - timedelta(minutes=minutes)).date().isoformat()
     if re.fullmatch(r"\d+s", raw):
         seconds = int(raw[:-1])
-        return (NOW - timedelta(seconds=seconds)).date().isoformat()
+        return (now - timedelta(seconds=seconds)).date().isoformat()
     match = re.fullmatch(r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})(?:,\s*(\d{4}))?", raw)
     if match:
         month = MONTHS[match.group(1)]
         day = int(match.group(2))
-        year = int(match.group(3)) if match.group(3) else 2026
+        year = int(match.group(3)) if match.group(3) else now.year
         return datetime(year, month, day).date().isoformat()
     return raw
 

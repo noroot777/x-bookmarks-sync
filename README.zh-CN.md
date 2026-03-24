@@ -49,13 +49,16 @@
 默认写入：
 
 ```text
-/Users/fjh/obs/foan/origin/X
+~/Obsidian/X Bookmarks
 ```
 
-如果你准备发布到 GitHub 给别人用，通常需要把下面两个脚本里的路径改成用户自己的 Obsidian 目录：
+不需要直接改脚本。
 
-- `scripts/generate_x_obsidian_notes.py`
-- `scripts/sync_x_bookmarks.sh`
+复制 `x_bookmarks_sync.env.example` 为 `x_bookmarks_sync.env`，然后设置：
+
+```bash
+X_BOOKMARKS_TARGET_DIR="$HOME/你的/Obsidian/目录"
+```
 
 ## 依赖要求
 
@@ -81,9 +84,10 @@
 ## 快速开始
 
 1. 把这个目录放到 `~/.codex/skills/x-bookmarks-sync`
-2. 在你当前使用的 Chrome 会话里开启 remote debugging
-3. 确保你已经在 Chrome 中登录 X
-4. 对 Codex 说 `同步 X 书签`
+2. 如果你想自定义输出路径，先把 `x_bookmarks_sync.env.example` 复制成 `x_bookmarks_sync.env`
+3. 在你当前使用的 Chrome 会话里开启 remote debugging
+4. 确保你已经在 Chrome 中登录 X
+5. 对 Codex 说 `同步 X 书签`
 
 ## 在 Codex 里怎么触发
 
@@ -155,6 +159,12 @@ Chrome 在建立新的远程调试连接时，可能会弹出权限确认框。
 ~/.codex/skills/x-bookmarks-sync/scripts/sync_x_bookmarks.sh
 ```
 
+可选本地配置文件：
+
+```text
+~/.codex/skills/x-bookmarks-sync/x_bookmarks_sync.env
+```
+
 ## 目录说明
 
 - `SKILL.md`
@@ -173,7 +183,7 @@ Chrome 在建立新的远程调试连接时，可能会弹出权限确认框。
 - 如果 X 修改页面结构、登录流程、风控策略，这个 skill 可能需要更新。
 - 如果 Chrome 版本太低，脚本会直接给出明确提示。
 - 如果没开启 remote debugging，脚本也会直接提示。
-- 当前实现默认绑定的是一个固定 Obsidian 路径，发布给别人用前建议先参数化或改成可配置。
+- 默认输出路径只是通用示例。针对你自己的机器路径，建议放到 `x_bookmarks_sync.env` 里配置，不要直接改源码。
 
 ## 发布到 GitHub 时建议补充说明
 

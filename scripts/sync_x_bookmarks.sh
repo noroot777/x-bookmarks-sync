@@ -2,14 +2,29 @@
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEVTOOLS_FILE="$HOME/Library/Application Support/Google/Chrome/DevToolsActivePort"
+CONFIG_FILE="${X_BOOKMARKS_CONFIG_FILE:-$SKILL_DIR/x_bookmarks_sync.env}"
+
+if [[ -f "$CONFIG_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$CONFIG_FILE"
+  set +a
+fi
+
+DEVTOOLS_FILE="${X_BOOKMARKS_DEVTOOLS_FILE:-$HOME/Library/Application Support/Google/Chrome/DevToolsActivePort}"
 EXPORT_SCRIPT="$SKILL_DIR/scripts/export_x_bookmarks.devbrowser.js"
 GENERATE_SCRIPT="$SKILL_DIR/scripts/generate_x_obsidian_notes.py"
-STATE_FILE="/Users/fjh/obs/foan/origin/X/.x_bookmarks_state.json"
-DEV_BROWSER_TMP="$HOME/.dev-browser/tmp"
-KNOWN_LINKS_FILE="$DEV_BROWSER_TMP/x-bookmarks-known.json"
-CHROME_BIN="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-MIN_SUPPORTED_CHROME_MAJOR=144
+TARGET_DIR="${X_BOOKMARKS_TARGET_DIR:-$HOME/Obsidian/X Bookmarks}"
+STATE_FILE="${X_BOOKMARKS_STATE_FILE:-$TARGET_DIR/.x_bookmarks_state.json}"
+DEV_BROWSER_TMP="${X_BOOKMARKS_DEV_BROWSER_TMP:-$HOME/.dev-browser/tmp}"
+KNOWN_LINKS_FILE="${X_BOOKMARKS_KNOWN_LINKS_FILE:-$DEV_BROWSER_TMP/x-bookmarks-known.json}"
+CHROME_BIN="${X_BOOKMARKS_CHROME_BIN:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
+MIN_SUPPORTED_CHROME_MAJOR="${X_BOOKMARKS_MIN_CHROME_MAJOR:-144}"
+SOURCE_JSON="${X_BOOKMARKS_SOURCE_JSON:-$DEV_BROWSER_TMP/x-bookmarks-export.json}"
+
+export X_BOOKMARKS_TARGET_DIR="$TARGET_DIR"
+export X_BOOKMARKS_STATE_FILE="$STATE_FILE"
+export X_BOOKMARKS_SOURCE_JSON="$SOURCE_JSON"
 
 ensure_dev_browser() {
   if command -v dev-browser >/dev/null 2>&1; then
@@ -71,9 +86,10 @@ mkdir -p "$DEV_BROWSER_TMP"
 if [[ -f "$STATE_FILE" ]]; then
   python3 - <<'PY' > "$KNOWN_LINKS_FILE"
 import json
+import os
 from pathlib import Path
 
-state = Path("/Users/fjh/obs/foan/origin/X/.x_bookmarks_state.json")
+state = Path(os.environ["X_BOOKMARKS_STATE_FILE"]).expanduser()
 try:
     data = json.loads(state.read_text(encoding="utf-8"))
     entries = data.get("entries", {})
@@ -88,4 +104,4 @@ fi
 dev-browser --connect "$ENDPOINT" --timeout 900 run "$EXPORT_SCRIPT"
 python3 "$GENERATE_SCRIPT"
 
-echo "Synced X bookmarks into /Users/fjh/obs/foan/origin/X"
+echo "Synced X bookmarks into $TARGET_DIR"

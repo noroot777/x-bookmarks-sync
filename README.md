@@ -49,13 +49,16 @@ This skill is designed for Codex-style agents and local desktop workflows where:
 By default, notes are written to:
 
 ```text
-/Users/fjh/obs/foan/origin/X
+~/Obsidian/X Bookmarks
 ```
 
-If you want to publish this skill for other users, they will likely need to edit the target path in:
+You do not need to edit the scripts to change this.
 
-- `scripts/generate_x_obsidian_notes.py`
-- `scripts/sync_x_bookmarks.sh`
+Copy `x_bookmarks_sync.env.example` to `x_bookmarks_sync.env` and set:
+
+```bash
+X_BOOKMARKS_TARGET_DIR="$HOME/path/to/your/Obsidian/folder"
+```
 
 ## Requirements
 
@@ -81,9 +84,10 @@ If you are publishing to GitHub and another user wants to install it manually, t
 ## Quick start
 
 1. Put this folder in `~/.codex/skills/x-bookmarks-sync`
-2. Enable remote debugging in your current Chrome session
-3. Make sure you are already signed in to X in Chrome
-4. Ask Codex to `Sync X bookmarks`
+2. Copy `x_bookmarks_sync.env.example` to `x_bookmarks_sync.env` if you want a custom output path
+3. Enable remote debugging in your current Chrome session
+4. Make sure you are already signed in to X in Chrome
+5. Ask Codex to `Sync X bookmarks`
 
 ## How to use in Codex
 
@@ -155,6 +159,12 @@ You can also run the sync directly:
 ~/.codex/skills/x-bookmarks-sync/scripts/sync_x_bookmarks.sh
 ```
 
+Optional local config file:
+
+```text
+~/.codex/skills/x-bookmarks-sync/x_bookmarks_sync.env
+```
+
 ## Files
 
 - `SKILL.md`
@@ -173,7 +183,7 @@ You can also run the sync directly:
 - If X changes page structure, login flow, or anti-automation behavior, this skill may need updates.
 - If Chrome is too old, the script exits with a clear version message.
 - If remote debugging is not enabled, the script exits with instructions.
-- The current implementation is tailored to one local Obsidian path and should be customized before broader reuse.
+- The default output path is only a safe example. Use `x_bookmarks_sync.env` for your own machine-specific settings.
 
 ## Recommended publishing notes
 
