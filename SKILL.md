@@ -11,6 +11,12 @@ Capture saved links and X bookmarks from the user's real Chrome session into Obs
 
 Use this workflow in Codex, Claude Code, OpenCode, and OpenClaw.
 
+Before first use, tell the user to configure their Obsidian target directory:
+
+- `web_capture_to_obsidian.env` for generic web capture
+- `x_bookmarks_sync.env` for X bookmark sync
+- the target directory must be an absolute path
+
 ### For one link or pasted text containing URLs
 
 1. Run export-only capture:
@@ -57,7 +63,7 @@ In standalone LLM mode, the shell scripts use the local `codex` CLI. If `codex` 
 - If the user wants to capture one link or pasted text with URLs, use `scripts/organize_knowledge.sh`.
 - If the user wants full X bookmark sync, use `scripts/sync_x_bookmarks.sh`.
 - If the user explicitly says not to use the model, disable LLM participation and skip overrides.
-- If the user wants a custom output path, tell them to create `web_capture_to_obsidian.env` or `x_bookmarks_sync.env` from the example files instead of editing the scripts directly.
+- On first use, tell them to create `web_capture_to_obsidian.env` or `x_bookmarks_sync.env` from the example files and set the Obsidian target directory to an absolute path instead of editing the scripts directly.
 
 ## Supported Sources
 

@@ -36,6 +36,8 @@ The recommended cross-client flow is:
 3. Let the agent write the overrides JSON
 4. Run the generator script to write final Obsidian notes
 
+Before first use, set your Obsidian target directory in a local env file and use an absolute path.
+
 For generic web capture:
 
 ```bash
@@ -73,7 +75,7 @@ In that mode, the LLM enhancement step uses the local `codex` CLI. If you do not
 
 ## Installation in AI clients
 
-Current public Git URL:
+Public Git URL:
 
 ```text
 https://github.com/noroot777/web-capture-to-obsidian.git
@@ -249,6 +251,8 @@ Main setting:
 WEB_CAPTURE_TO_OBSIDIAN_TARGET_DIR="$HOME/path/to/your/Obsidian/folder"
 ```
 
+Use an absolute path such as `/Users/your-name/Obsidian/Web Capture`.
+
 For X bookmarks:
 
 ```text
@@ -260,6 +264,8 @@ Main setting:
 ```bash
 X_BOOKMARKS_TARGET_DIR="$HOME/path/to/your/Obsidian/folder"
 ```
+
+Use an absolute path such as `/Users/your-name/Obsidian/X Bookmarks`.
 
 Both flows support overriding:
 
@@ -273,6 +279,7 @@ Both flows support overriding:
 Compatibility note:
 
 - Legacy `knowledge-organizer` config file and environment variable names are still accepted, but `web-capture-to-obsidian` is now the canonical public name.
+- On first use, the shell scripts now stop with a clear message until the Obsidian target directory is configured.
 
 ## Output
 

@@ -15,6 +15,11 @@ for file in "$LEGACY_X_CONFIG_FILE" "$LEGACY_CONFIG_FILE" "$CONFIG_FILE"; do
   fi
 done
 
+TARGET_DIR_CONFIGURED=0
+if [[ -n "${WEB_CAPTURE_TO_OBSIDIAN_TARGET_DIR:-}" || -n "${KNOWLEDGE_ORGANIZER_TARGET_DIR:-}" || -n "${X_BOOKMARKS_TARGET_DIR:-}" ]]; then
+  TARGET_DIR_CONFIGURED=1
+fi
+
 DEVTOOLS_FILE="${WEB_CAPTURE_TO_OBSIDIAN_DEVTOOLS_FILE:-${KNOWLEDGE_ORGANIZER_DEVTOOLS_FILE:-${X_BOOKMARKS_DEVTOOLS_FILE:-$HOME/Library/Application Support/Google/Chrome/DevToolsActivePort}}}"
 EXTRACT_SCRIPT="$SKILL_DIR/scripts/extract_input_urls.py"
 EXPORT_SCRIPT="$SKILL_DIR/scripts/export_knowledge_pages.devbrowser.js"
@@ -31,6 +36,7 @@ LLM_OVERRIDES_FILE="${WEB_CAPTURE_TO_OBSIDIAN_LLM_OVERRIDES_FILE:-${KNOWLEDGE_OR
 USE_LLM="${WEB_CAPTURE_TO_OBSIDIAN_USE_LLM:-${KNOWLEDGE_ORGANIZER_USE_LLM:-${X_BOOKMARKS_USE_LLM:-1}}}"
 SKIP_EXPORT="${WEB_CAPTURE_TO_OBSIDIAN_SKIP_EXPORT:-${KNOWLEDGE_ORGANIZER_SKIP_EXPORT:-0}}"
 SKIP_GENERATE="${WEB_CAPTURE_TO_OBSIDIAN_SKIP_GENERATE:-${KNOWLEDGE_ORGANIZER_SKIP_GENERATE:-0}}"
+DEFAULT_TARGET_DIR="$HOME/Obsidian/Web Capture to Obsidian"
 
 export WEB_CAPTURE_TO_OBSIDIAN_TARGET_DIR="$TARGET_DIR"
 export WEB_CAPTURE_TO_OBSIDIAN_STATE_FILE="$STATE_FILE"
@@ -40,6 +46,24 @@ export KNOWLEDGE_ORGANIZER_TARGET_DIR="$TARGET_DIR"
 export KNOWLEDGE_ORGANIZER_STATE_FILE="$STATE_FILE"
 export KNOWLEDGE_ORGANIZER_SOURCE_JSON="$SOURCE_JSON"
 export KNOWLEDGE_ORGANIZER_LLM_OVERRIDES_FILE="$LLM_OVERRIDES_FILE"
+
+ensure_target_dir_configured() {
+  if [[ "$TARGET_DIR_CONFIGURED" == "1" ]]; then
+    return
+  fi
+
+  echo "First-time setup required before using web-capture-to-obsidian." >&2
+  echo "Create web_capture_to_obsidian.env from web_capture_to_obsidian.env.example and set WEB_CAPTURE_TO_OBSIDIAN_TARGET_DIR to your Obsidian notes folder using an absolute path." >&2
+  exit 1
+}
+
+ensure_absolute_target_dir() {
+  if [[ "$TARGET_DIR" != /* ]]; then
+    echo "WEB_CAPTURE_TO_OBSIDIAN_TARGET_DIR must be an absolute path. Current value: $TARGET_DIR" >&2
+    echo "Update web_capture_to_obsidian.env and set WEB_CAPTURE_TO_OBSIDIAN_TARGET_DIR to an absolute path like /Users/you/obsidian/Web Capture." >&2
+    exit 1
+  fi
+}
 
 ensure_dev_browser() {
   if command -v dev-browser >/dev/null 2>&1; then
@@ -103,6 +127,8 @@ collect_input() {
 }
 
 RAW_INPUT="$(collect_input "$@")"
+ensure_target_dir_configured
+ensure_absolute_target_dir
 mkdir -p "$DEV_BROWSER_TMP"
 
 URLS_JSON_CONTENT="$(python3 "$EXTRACT_SCRIPT" "$RAW_INPUT")"

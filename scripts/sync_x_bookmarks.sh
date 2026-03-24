@@ -11,6 +11,11 @@ if [[ -f "$CONFIG_FILE" ]]; then
   set +a
 fi
 
+TARGET_DIR_CONFIGURED=0
+if [[ -n "${X_BOOKMARKS_TARGET_DIR:-}" ]]; then
+  TARGET_DIR_CONFIGURED=1
+fi
+
 DEVTOOLS_FILE="${X_BOOKMARKS_DEVTOOLS_FILE:-$HOME/Library/Application Support/Google/Chrome/DevToolsActivePort}"
 EXPORT_SCRIPT="$SKILL_DIR/scripts/export_x_bookmarks.devbrowser.js"
 GENERATE_SCRIPT="$SKILL_DIR/scripts/generate_x_obsidian_notes.py"
@@ -26,11 +31,30 @@ LLM_OVERRIDES_FILE="${X_BOOKMARKS_LLM_OVERRIDES_FILE:-$DEV_BROWSER_TMP/x-bookmar
 USE_LLM="${X_BOOKMARKS_USE_LLM:-1}"
 SKIP_EXPORT="${X_BOOKMARKS_SKIP_EXPORT:-0}"
 SKIP_GENERATE="${X_BOOKMARKS_SKIP_GENERATE:-0}"
+DEFAULT_TARGET_DIR="$HOME/Obsidian/X Bookmarks"
 
 export X_BOOKMARKS_TARGET_DIR="$TARGET_DIR"
 export X_BOOKMARKS_STATE_FILE="$STATE_FILE"
 export X_BOOKMARKS_SOURCE_JSON="$SOURCE_JSON"
 export X_BOOKMARKS_LLM_OVERRIDES_FILE="$LLM_OVERRIDES_FILE"
+
+ensure_target_dir_configured() {
+  if [[ "$TARGET_DIR_CONFIGURED" == "1" ]]; then
+    return
+  fi
+
+  echo "First-time setup required before syncing X bookmarks." >&2
+  echo "Create x_bookmarks_sync.env from x_bookmarks_sync.env.example and set X_BOOKMARKS_TARGET_DIR to your Obsidian notes folder using an absolute path." >&2
+  exit 1
+}
+
+ensure_absolute_target_dir() {
+  if [[ "$TARGET_DIR" != /* ]]; then
+    echo "X_BOOKMARKS_TARGET_DIR must be an absolute path. Current value: $TARGET_DIR" >&2
+    echo "Update x_bookmarks_sync.env and set X_BOOKMARKS_TARGET_DIR to an absolute path like /Users/you/obsidian/X Bookmarks." >&2
+    exit 1
+  fi
+}
 
 ensure_dev_browser() {
   if command -v dev-browser >/dev/null 2>&1; then
@@ -78,6 +102,8 @@ check_chrome_version() {
   fi
 }
 
+ensure_target_dir_configured
+ensure_absolute_target_dir
 ensure_dev_browser
 check_chrome_version
 

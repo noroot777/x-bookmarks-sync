@@ -36,6 +36,8 @@
 3. 让 agent 写 overrides JSON
 4. 再调用生成脚本落盘到 Obsidian
 
+首次使用前，先在本地 env 文件里设置 Obsidian 保存目录，并且必须使用绝对路径。
+
 通用网页抓取：
 
 ```bash
@@ -73,7 +75,7 @@ X 书签 overrides 格式：
 
 ## 安装到 AI 客户端
 
-当前公开可用的 Git 地址：
+公开 Git 地址：
 
 ```text
 https://github.com/noroot777/web-capture-to-obsidian.git
@@ -249,6 +251,8 @@ web_capture_to_obsidian.env.example -> web_capture_to_obsidian.env
 WEB_CAPTURE_TO_OBSIDIAN_TARGET_DIR="$HOME/你的/Obsidian/目录"
 ```
 
+请使用绝对路径，例如 `/Users/your-name/Obsidian/Web Capture`。
+
 X 书签同步继续使用：
 
 ```text
@@ -260,6 +264,8 @@ x_bookmarks_sync.env.example -> x_bookmarks_sync.env
 ```bash
 X_BOOKMARKS_TARGET_DIR="$HOME/你的/Obsidian/目录"
 ```
+
+请使用绝对路径，例如 `/Users/your-name/Obsidian/X Bookmarks`。
 
 两条流程都支持覆盖：
 
@@ -273,6 +279,7 @@ X_BOOKMARKS_TARGET_DIR="$HOME/你的/Obsidian/目录"
 兼容说明：
 
 - 老的 `knowledge-organizer` 配置文件名和环境变量名仍然可用，但公开主名称已经统一改为 `web-capture-to-obsidian`。
+- 现在 shell 脚本在首次使用时会先检查是否已经配置 Obsidian 绝对路径；没配置就会直接提示并停止执行。
 
 ## 输出位置
 
