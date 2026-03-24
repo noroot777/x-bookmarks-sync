@@ -10,6 +10,8 @@
 Sync your X.com bookmarks into Obsidian notes by reusing your real, logged-in Chrome session.
 Use it either as a standalone shell workflow or as a skill/integration inside an agent tool.
 
+Recommended mode: let an LLM agent export the bookmarks, improve titles and summaries, then generate the final notes.
+
 ## At a glance
 
 - Uses your existing authenticated Chrome session instead of a separate scraper login
@@ -30,6 +32,7 @@ This project is useful for local desktop workflows where:
 - Connects to your current Chrome session through remote debugging
 - Reads your X bookmarks from `https://x.com/i/bookmarks`
 - Writes one Markdown note per bookmark into your Obsidian vault
+- Supports LLM-written title and summary overrides during agent execution
 - Preserves numbering with filenames like:
 
 ```text
@@ -94,7 +97,9 @@ What the agent should generally do:
 - copy `x_bookmarks_sync.env.example` to `x_bookmarks_sync.env`
 - set `X_BOOKMARKS_TARGET_DIR` to your actual Obsidian path
 - verify Chrome remote debugging is enabled
-- run `./scripts/sync_x_bookmarks.sh`
+- run `X_BOOKMARKS_SKIP_GENERATE=1 ./scripts/sync_x_bookmarks.sh`
+- write `x-bookmarks-llm-overrides.json` based on the exported bookmarks
+- run `python3 scripts/generate_x_obsidian_notes.py`
 
 ### Option 2: Install it as a Codex skill
 
@@ -141,6 +146,27 @@ If your agent can run shell commands, prompts such as these usually work:
 - `Sync my X bookmarks into Obsidian`
 - `Refresh my X bookmarks notes`
 - `Run the x-bookmarks-sync script`
+- `Export my X bookmarks, improve each note title and summary with the model, then generate the final Obsidian notes`
+
+## LLM-assisted extraction
+
+If an agent is running this project, it can improve title and summary quality by writing:
+
+```text
+~/.dev-browser/tmp/x-bookmarks-llm-overrides.json
+```
+
+The generator automatically reads that file when present. See:
+
+- `x_bookmarks_llm_overrides.example.json`
+- `SKILL.md`
+
+Recommended agent flow:
+
+1. Run `X_BOOKMARKS_SKIP_GENERATE=1 ./scripts/sync_x_bookmarks.sh`
+2. Read `~/.dev-browser/tmp/x-bookmarks-export.json`
+3. Write better `title` and `summary` values into `~/.dev-browser/tmp/x-bookmarks-llm-overrides.json`
+4. Run `python3 scripts/generate_x_obsidian_notes.py`
 
 ## How it works
 
@@ -219,6 +245,8 @@ bash /path/to/x-bookmarks-sync/scripts/sync_x_bookmarks.sh
 
 - `SKILL.md`
   - an example skill definition for tools that support skill-style metadata
+- `x_bookmarks_llm_overrides.example.json`
+  - example format for LLM-generated title and summary overrides
 - `scripts/sync_x_bookmarks.sh`
   - environment checks, Chrome endpoint discovery, sync entrypoint
 - `scripts/export_x_bookmarks.devbrowser.js`

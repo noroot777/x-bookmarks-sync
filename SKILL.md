@@ -9,14 +9,73 @@ Syncs X bookmarks from the user's real Chrome session into a configurable Obsidi
 
 ## Workflow
 
-1. Run [`scripts/sync_x_bookmarks.sh`](scripts/sync_x_bookmarks.sh).
-2. The script will:
-   - verify that the installed Chrome version supports the current-session remote-debugging flow
-   - auto-install `dev-browser` if it is missing
-   - reuse the user's logged-in Chrome session via `chrome://inspect#remote-debugging`
-3. If Chrome shows a remote-debugging permission prompt, wait for the user to click `Allow`, then rerun the sync script.
-4. Report how many bookmarks were synced and where the notes were written.
-5. If the user wants a custom location, tell them to create `x_bookmarks_sync.env` from `x_bookmarks_sync.env.example` instead of editing the scripts directly.
+1. Export bookmarks without generating final notes yet:
+   - `X_BOOKMARKS_SKIP_GENERATE=1 ./scripts/sync_x_bookmarks.sh`
+2. Read the exported bookmarks JSON from `X_BOOKMARKS_SOURCE_JSON`.
+   - default: `~/.dev-browser/tmp/x-bookmarks-export.json`
+3. Use the model to improve each bookmark's `title` and `summary`.
+4. Write those improvements to `X_BOOKMARKS_LLM_OVERRIDES_FILE`.
+   - default: `~/.dev-browser/tmp/x-bookmarks-llm-overrides.json`
+5. Run:
+   - `python3 scripts/generate_x_obsidian_notes.py`
+6. Report how many bookmarks were synced and where the notes were written.
+
+## LLM Override Format
+
+Write JSON in either of these shapes:
+
+```json
+{
+  "entries": {
+    "https://x.com/.../status/123": {
+      "title": "Better title here",
+      "summary": [
+        "First key point",
+        "Second key point",
+        "Third key point"
+      ]
+    }
+  }
+}
+```
+
+Or:
+
+```json
+{
+  "https://x.com/.../status/123": {
+    "title": "Better title here",
+    "summary": "- First key point\n- Second key point"
+  }
+}
+```
+
+See also:
+
+- [`x_bookmarks_llm_overrides.example.json`](x_bookmarks_llm_overrides.example.json)
+
+## Extraction Guidance
+
+When generating `title` and `summary`:
+
+- Prefer the real core idea over the first visible line.
+- Remove handles, metrics, and low-signal UI boilerplate.
+- For link-heavy posts, summarize what the linked resource is about.
+- Keep `title` concise and filename-friendly.
+- Keep `summary` to 1-3 concrete bullets.
+
+## Shell Entry Point
+
+[`scripts/sync_x_bookmarks.sh`](scripts/sync_x_bookmarks.sh) will:
+
+- verify that the installed Chrome version supports the current-session remote-debugging flow
+- auto-install `dev-browser` if it is missing
+- reuse the user's logged-in Chrome session via `chrome://inspect#remote-debugging`
+- export bookmarks
+- optionally skip final generation when `X_BOOKMARKS_SKIP_GENERATE=1`
+
+If Chrome shows a remote-debugging permission prompt, wait for the user to click `Allow`, then rerun the sync script.
+If the user wants a custom location, tell them to create `x_bookmarks_sync.env` from `x_bookmarks_sync.env.example` instead of editing the scripts directly.
 
 ## What It Writes
 

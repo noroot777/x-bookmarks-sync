@@ -24,6 +24,7 @@ SOURCE_JSON = env_path("X_BOOKMARKS_SOURCE_JSON", "~/.dev-browser/tmp/x-bookmark
 TARGET_DIR = env_path("X_BOOKMARKS_TARGET_DIR", "~/Obsidian/X Bookmarks")
 INDEX_FILE = TARGET_DIR / "000 - X 书签索引.md"
 STATE_FILE = env_path("X_BOOKMARKS_STATE_FILE", str(TARGET_DIR / ".x_bookmarks_state.json"))
+LLM_OVERRIDES_FILE = env_path("X_BOOKMARKS_LLM_OVERRIDES_FILE", "~/.dev-browser/tmp/x-bookmarks-llm-overrides.json")
 STATE_SEQUENCE_MODE = "bookmark-list-order-v1"
 LOCAL_TZ = local_timezone()
 TWITTER_EPOCH_MS = 1288834974657
@@ -127,7 +128,30 @@ def content_lines(lines):
     return out
 
 
-def derive_title(item):
+def load_llm_overrides():
+    if not LLM_OVERRIDES_FILE.exists():
+        return {}
+    try:
+        data = json.loads(LLM_OVERRIDES_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if isinstance(data, dict) and isinstance(data.get("entries"), dict):
+        data = data["entries"]
+    return data if isinstance(data, dict) else {}
+
+
+def item_override(item, overrides):
+    if not isinstance(overrides, dict):
+        return {}
+    return overrides.get(item.get("statusLink", ""), {})
+
+
+def derive_title(item, overrides=None):
+    override = item_override(item, overrides)
+    custom_title = str(override.get("title", "")).strip()
+    if custom_title:
+        return custom_title
+
     lines = content_lines(item.get("lines", []))
     author = item.get("author", "").strip()
     filtered = [line for line in lines if line != author]
@@ -143,7 +167,31 @@ def derive_title(item):
     return filtered[0]
 
 
-def derive_summary(item, title):
+def format_summary_lines(summary_lines):
+    clean = []
+    for line in summary_lines:
+        text = str(line).strip()
+        if not text:
+            continue
+        clean.append(text.removeprefix("- ").strip())
+        if len(clean) >= 3:
+            break
+    return "\n".join(f"- {part}" for part in clean)
+
+
+def derive_summary(item, title, overrides=None):
+    override = item_override(item, overrides)
+    custom_summary = override.get("summary")
+    if isinstance(custom_summary, str) and custom_summary.strip():
+        lines = [line.strip() for line in custom_summary.splitlines() if line.strip()]
+        formatted = format_summary_lines(lines)
+        if formatted:
+            return formatted
+    if isinstance(custom_summary, list):
+        formatted = format_summary_lines(custom_summary)
+        if formatted:
+            return formatted
+
     lines = content_lines(item.get("lines", []))
     author = item.get("author", "").strip()
     filtered = [line for line in lines if line != author]
@@ -197,8 +245,8 @@ def clean_filename(name: str) -> str:
     return f"{stem}{ext}"
 
 
-def filename_stem(item, duplicate_index: int = 0) -> str:
-    title = derive_title(item)
+def filename_stem(item, duplicate_index: int = 0, overrides=None) -> str:
+    title = derive_title(item, overrides)
     author = item.get("handle", "").lstrip("@") or item.get("author", "unknown")
     status_id = item.get("statusLink", "").rstrip("/").split("/")[-1]
     dt = parse_status_datetime(status_id)
@@ -210,13 +258,13 @@ def filename_stem(item, duplicate_index: int = 0) -> str:
     return base
 
 
-def note_filename(item, duplicate_index: int = 0) -> str:
-    return clean_filename(f"{filename_stem(item, duplicate_index)}.md")
+def note_filename(item, duplicate_index: int = 0, overrides=None) -> str:
+    return clean_filename(f"{filename_stem(item, duplicate_index, overrides)}.md")
 
 
-def note_content(item):
-    title = derive_title(item)
-    summary = derive_summary(item, title)
+def note_content(item, overrides=None):
+    title = derive_title(item, overrides)
+    summary = derive_summary(item, title, overrides)
     source = item.get("statusLink", "")
     author = item.get("author", "").strip()
     handle = item.get("handle", "").strip()
@@ -311,6 +359,7 @@ def main():
     data = json.loads(SOURCE_JSON.read_text(encoding="utf-8"))
     TARGET_DIR.mkdir(parents=True, exist_ok=True)
     bookmark_items = [item for item in data if item.get("statusLink")]
+    overrides = load_llm_overrides()
 
     state = load_state()
     previous_entries = state.get("entries", {})
@@ -349,9 +398,9 @@ def main():
     for item in bookmark_items:
         source = item.get("statusLink", "")
         sequence = assigned_sequences[source]
-        filename = clean_filename(f"{sequence:0{width}d} - {filename_stem(item)}.md")
+        filename = clean_filename(f"{sequence:0{width}d} - {filename_stem(item, overrides=overrides)}.md")
         target = TARGET_DIR / filename
-        target.write_text(note_content(item), encoding="utf-8")
+        target.write_text(note_content(item, overrides), encoding="utf-8")
         created.append(str(target))
         desired_names.add(filename)
         ordered_entries.append((sequence, item, filename))
@@ -375,6 +424,7 @@ def main():
                 "generated_at": datetime.now(LOCAL_TZ).isoformat(),
                 "count": len(bookmark_items),
                 "source_json": str(SOURCE_JSON),
+                "llm_overrides_file": str(LLM_OVERRIDES_FILE) if LLM_OVERRIDES_FILE.exists() else "",
                 "sequence_mode": STATE_SEQUENCE_MODE,
                 "entries": new_state_entries,
             },

@@ -1,0 +1,12 @@
+{
+  "entries": {
+    "https://x.com/example/status/1234567890": {
+      "title": "A clearer, higher-signal bookmark title",
+      "summary": [
+        "First key takeaway from the post",
+        "Second key takeaway or linked resource",
+        "Third key takeaway if needed"
+      ]
+    }
+  }
+}

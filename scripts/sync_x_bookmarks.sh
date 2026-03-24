@@ -21,10 +21,14 @@ KNOWN_LINKS_FILE="${X_BOOKMARKS_KNOWN_LINKS_FILE:-$DEV_BROWSER_TMP/x-bookmarks-k
 CHROME_BIN="${X_BOOKMARKS_CHROME_BIN:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 MIN_SUPPORTED_CHROME_MAJOR="${X_BOOKMARKS_MIN_CHROME_MAJOR:-144}"
 SOURCE_JSON="${X_BOOKMARKS_SOURCE_JSON:-$DEV_BROWSER_TMP/x-bookmarks-export.json}"
+LLM_OVERRIDES_FILE="${X_BOOKMARKS_LLM_OVERRIDES_FILE:-$DEV_BROWSER_TMP/x-bookmarks-llm-overrides.json}"
+SKIP_EXPORT="${X_BOOKMARKS_SKIP_EXPORT:-0}"
+SKIP_GENERATE="${X_BOOKMARKS_SKIP_GENERATE:-0}"
 
 export X_BOOKMARKS_TARGET_DIR="$TARGET_DIR"
 export X_BOOKMARKS_STATE_FILE="$STATE_FILE"
 export X_BOOKMARKS_SOURCE_JSON="$SOURCE_JSON"
+export X_BOOKMARKS_LLM_OVERRIDES_FILE="$LLM_OVERRIDES_FILE"
 
 ensure_dev_browser() {
   if command -v dev-browser >/dev/null 2>&1; then
@@ -101,7 +105,16 @@ else
   printf '[]' > "$KNOWN_LINKS_FILE"
 fi
 
-dev-browser --connect "$ENDPOINT" --timeout 900 run "$EXPORT_SCRIPT"
-python3 "$GENERATE_SCRIPT"
+if [[ "$SKIP_EXPORT" != "1" ]]; then
+  dev-browser --connect "$ENDPOINT" --timeout 900 run "$EXPORT_SCRIPT"
+fi
 
-echo "Synced X bookmarks into $TARGET_DIR"
+if [[ "$SKIP_GENERATE" != "1" ]]; then
+  python3 "$GENERATE_SCRIPT"
+fi
+
+if [[ "$SKIP_GENERATE" == "1" ]]; then
+  echo "Exported X bookmarks to $SOURCE_JSON"
+else
+  echo "Synced X bookmarks into $TARGET_DIR"
+fi
