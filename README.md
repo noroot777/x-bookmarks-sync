@@ -74,7 +74,7 @@ X_BOOKMARKS_TARGET_DIR="$HOME/path/to/your/Obsidian/folder"
 
 ## Installation options
 
-You can use this project in three common ways.
+You can use this project in four common ways.
 
 ### Option 1: Run it as a standalone shell workflow
 
@@ -121,6 +121,26 @@ Typical patterns:
 - create a task or automation entry that launches the sync script in this repo
 
 For tools without a formal skill format, using the shell script directly is usually the simplest setup.
+
+### Option 4: Ask an LLM agent to install it for you
+
+If your assistant can access your filesystem and run shell commands, you can ask it to install this repo for you.
+
+Example prompts:
+
+- `Help me install x-bookmarks-sync from https://github.com/noroot777/x-bookmarks-sync`
+- `Clone this repo, copy x_bookmarks_sync.env.example to x_bookmarks_sync.env, and configure it for my Obsidian folder`
+- `Install this as a skill in my local agent setup and make it run scripts/sync_x_bookmarks.sh`
+- `Set up x-bookmarks-sync on this machine and tell me how to run it`
+
+What the agent should generally do:
+
+- clone the repository
+- place it in the correct skills/tools directory if your host uses one
+- copy `x_bookmarks_sync.env.example` to `x_bookmarks_sync.env`
+- set `X_BOOKMARKS_TARGET_DIR` to your actual Obsidian path
+- verify Chrome remote debugging is enabled
+- run `./scripts/sync_x_bookmarks.sh`
 
 ## Quick start
 
@@ -231,15 +251,6 @@ bash /path/to/x-bookmarks-sync/scripts/sync_x_bookmarks.sh
 - If Chrome is too old, the script exits with a clear version message.
 - If remote debugging is not enabled, the script exits with instructions.
 - The default output path is only a safe example. Use `x_bookmarks_sync.env` for your own machine-specific settings.
-
-## Recommended publishing notes
-
-If you publish this on GitHub, consider documenting:
-
-- which agent hosts or tools you tested it with
-- the supported Chrome version range
-- whether the default Obsidian path is only an example or a required convention
-- whether users should commit `.x_bookmarks_state.json`
 
 ## Related caution
 
