@@ -22,6 +22,7 @@ GENERATE_SCRIPT="$SKILL_DIR/scripts/generate_x_bookmarks_obsidian_notes.py"
 LLM_SCRIPT="$SKILL_DIR/scripts/generate_x_bookmarks_llm_overrides.py"
 TARGET_DIR="${X_BOOKMARKS_TO_OBSIDIAN_TARGET_DIR:-$HOME/Obsidian/X Bookmarks to Obsidian}"
 STATE_FILE="${X_BOOKMARKS_TO_OBSIDIAN_STATE_FILE:-$TARGET_DIR/.x_bookmarks_to_obsidian_state.json}"
+LEGACY_STATE_FILE="${TARGET_DIR}/.x_bookmarks_state.json"
 DEV_BROWSER_TMP="${X_BOOKMARKS_TO_OBSIDIAN_DEV_BROWSER_TMP:-$HOME/.dev-browser/tmp}"
 KNOWN_LINKS_FILE="${X_BOOKMARKS_TO_OBSIDIAN_KNOWN_LINKS_FILE:-$DEV_BROWSER_TMP/x-bookmarks-to-obsidian-known.json}"
 CHROME_BIN="${X_BOOKMARKS_TO_OBSIDIAN_CHROME_BIN:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
@@ -106,6 +107,10 @@ ensure_absolute_target_dir
 ensure_dev_browser
 check_chrome_version
 
+if [[ ! -f "$STATE_FILE" && -f "$LEGACY_STATE_FILE" ]]; then
+  STATE_FILE="$LEGACY_STATE_FILE"
+fi
+
 if [[ ! -f "$DEVTOOLS_FILE" ]]; then
   echo "Chrome remote debugging is not enabled: $DEVTOOLS_FILE not found" >&2
   echo "Open chrome://inspect#remote-debugging in Chrome and enable remote debugging first." >&2
@@ -121,6 +126,8 @@ if [[ -z "$PORT" || -z "$WS_PATH" ]]; then
 fi
 
 ENDPOINT="ws://127.0.0.1:${PORT}${WS_PATH}"
+
+export X_BOOKMARKS_TO_OBSIDIAN_STATE_FILE="$STATE_FILE"
 
 mkdir -p "$DEV_BROWSER_TMP"
 
@@ -140,6 +147,26 @@ except Exception:
 PY
 else
   printf '[]' > "$KNOWN_LINKS_FILE"
+fi
+
+KNOWN_COUNT="$(KNOWN_LINKS_FILE="$KNOWN_LINKS_FILE" python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+path = Path(os.environ["KNOWN_LINKS_FILE"]).expanduser()
+try:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    print(len(data) if isinstance(data, list) else 0)
+except Exception:
+    print(0)
+PY
+)"
+
+if [[ -f "$STATE_FILE" ]]; then
+  echo "Loaded $KNOWN_COUNT known bookmarks from $STATE_FILE"
+else
+  echo "No prior state file found; export will scan until the end of the bookmark list"
 fi
 
 if [[ "$SKIP_EXPORT" != "1" ]]; then

@@ -18,6 +18,24 @@ const collected = new Map();
 let sameCount = 0;
 let lastSize = 0;
 let knownBatchCount = 0;
+let stopReason = "max-steps";
+let lastProgressAt = 0;
+
+function logProgress(step, itemsInView, knownMatches, note = "") {
+  const payload = {
+    phase: "export",
+    step: step + 1,
+    collected: collected.size,
+    itemsInView,
+    knownMatches,
+    knownBatches: knownBatchCount,
+    stagnantSteps: sameCount,
+  };
+  if (note) {
+    payload.note = note;
+  }
+  console.log(JSON.stringify(payload));
+}
 
 for (let step = 0; step < 500; step += 1) {
   const items = await page.evaluate(() => {
@@ -76,11 +94,21 @@ for (let step = 0; step < 500; step += 1) {
   }
   lastSize = collected.size;
 
+  const now = Date.now();
+  if (step === 0 || now - lastProgressAt >= 5000) {
+    lastProgressAt = now;
+    logProgress(step, batchLinks.length, knownMatches);
+  }
+
   if (sameCount >= 8) {
+    stopReason = "stagnant";
+    logProgress(step, batchLinks.length, knownMatches, "Reached repeated stagnant viewport threshold");
     break;
   }
 
   if (knownLinks.size > 0 && knownBatchCount >= 3) {
+    stopReason = "known-links";
+    logProgress(step, batchLinks.length, knownMatches, "Reached known bookmark area; stopping incremental export early");
     break;
   }
 
@@ -96,6 +124,8 @@ console.log(
     {
       count: items.length,
       savedPath,
+      stopReason,
+      knownLinks: knownLinks.size,
     },
     null,
     2,

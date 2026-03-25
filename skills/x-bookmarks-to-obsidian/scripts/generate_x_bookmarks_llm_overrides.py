@@ -184,12 +184,22 @@ def main() -> int:
         return 1
 
     items = load_items()
-    entries = load_existing_entries()
+    source_keys = [item.get("key") or item.get("statusLink", "") for item in items]
+    source_key_set = {key for key in source_keys if key}
+    entries = {
+        key: value
+        for key, value in load_existing_entries().items()
+        if key in source_key_set
+    }
     pending = [item for item in items if (item.get("key") or item.get("statusLink", "")) not in entries]
     total = len(items)
     OVERRIDES_FILE.parent.mkdir(parents=True, exist_ok=True)
 
     if not pending:
+        OVERRIDES_FILE.write_text(
+            json.dumps({"entries": entries}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
         print(json.dumps({"count": total, "overrides_file": str(OVERRIDES_FILE)}, ensure_ascii=False))
         return 0
 
@@ -211,8 +221,9 @@ def main() -> int:
             )
             print(f"checkpoint {len(entries)}/{total} saved to {OVERRIDES_FILE}", file=sys.stderr)
 
-    if len(entries) != total:
-        print(f"Expected {total} overrides, got {len(entries)}", file=sys.stderr)
+    resolved = sum(1 for key in source_keys if key in entries)
+    if resolved != total:
+        print(f"Expected {total} overrides, got {resolved}", file=sys.stderr)
         return 1
 
     print(json.dumps({"count": total, "overrides_file": str(OVERRIDES_FILE)}, ensure_ascii=False))

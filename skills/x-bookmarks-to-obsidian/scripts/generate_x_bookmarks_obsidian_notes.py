@@ -3,6 +3,7 @@ import os
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Optional
 from zoneinfo import ZoneInfo
 
 
@@ -26,6 +27,7 @@ INDEX_FILE = TARGET_DIR / "000 - X 书签索引.md"
 STATE_FILE = env_path("X_BOOKMARKS_TO_OBSIDIAN_STATE_FILE", str(TARGET_DIR / ".x_bookmarks_to_obsidian_state.json"))
 LLM_OVERRIDES_FILE = env_path("X_BOOKMARKS_TO_OBSIDIAN_LLM_OVERRIDES_FILE", "~/.dev-browser/tmp/x-bookmarks-to-obsidian-llm-overrides.json")
 STATE_SEQUENCE_MODE = "x-bookmarks-to-obsidian-v1"
+COMPATIBLE_SEQUENCE_MODES = {STATE_SEQUENCE_MODE, "bookmark-list-order-v1"}
 LOCAL_TZ = local_timezone()
 TWITTER_EPOCH_MS = 1288834974657
 
@@ -127,7 +129,7 @@ def parse_date(raw: str) -> str:
     return raw
 
 
-def parse_status_datetime(status_id: str) -> datetime | None:
+def parse_status_datetime(status_id: str) -> Optional[datetime]:
     if not status_id.isdigit():
         return None
     timestamp_ms = (int(status_id) >> 22) + TWITTER_EPOCH_MS
@@ -414,6 +416,40 @@ def index_content(ordered_entries):
     return "\n".join(lines)
 
 
+def existing_item_from_note(source: str, meta: dict):
+    filename = str(meta.get("filename", "")).strip()
+    if not filename:
+        return None
+    path = TARGET_DIR / filename
+    if not path.exists():
+        return None
+
+    author = ""
+    handle = ""
+    try:
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line.startswith("- 作者："):
+                continue
+            payload = line.removeprefix("- 作者：").strip()
+            match = re.fullmatch(r"(.+?) \((@[^)]+)\)", payload)
+            if match:
+                author = match.group(1).strip()
+                handle = match.group(2).strip()
+            else:
+                author = payload
+            break
+    except Exception:
+        return None
+
+    return {
+        "statusLink": source,
+        "author": author,
+        "handle": handle,
+        "time": "",
+    }
+
+
 def load_state():
     if not STATE_FILE.exists():
         return {"entries": {}}
@@ -439,7 +475,7 @@ def main():
     state = load_state()
     previous_entries = state.get("entries", {})
     sequence_mode = state.get("sequence_mode")
-    rebuild_sequences = not previous_entries or sequence_mode != STATE_SEQUENCE_MODE
+    rebuild_sequences = not previous_entries or sequence_mode not in COMPATIBLE_SEQUENCE_MODES
 
     created = []
     desired_names = set()
@@ -484,6 +520,23 @@ def main():
             "filename": filename,
         }
 
+    if not rebuild_sequences:
+        for source, previous in previous_entries.items():
+            if source in new_state_entries or not valid_sequence(previous):
+                continue
+            filename = str(previous.get("filename", "")).strip()
+            if not filename:
+                continue
+            existing_item = existing_item_from_note(source, previous)
+            if existing_item is None:
+                continue
+            desired_names.add(filename)
+            ordered_entries.append((int(previous["sequence"]), existing_item, filename))
+            new_state_entries[source] = {
+                "sequence": int(previous["sequence"]),
+                "filename": filename,
+            }
+
     desired_names.add(INDEX_FILE.name)
     desired_names.add(STATE_FILE.name)
 
@@ -497,7 +550,7 @@ def main():
         json.dumps(
             {
                 "generated_at": datetime.now(LOCAL_TZ).isoformat(),
-                "count": len(bookmark_items),
+                "count": len(new_state_entries),
                 "source_json": str(SOURCE_JSON),
                 "llm_overrides_file": str(LLM_OVERRIDES_FILE) if LLM_OVERRIDES_FILE.exists() else "",
                 "sequence_mode": STATE_SEQUENCE_MODE,
