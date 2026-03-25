@@ -345,7 +345,7 @@ def note_filename(item, sequence: int, width: int, overrides) -> str:
 
 
 def main():
-    source_file = SOURCE_JSON if SOURCE_JSON.exists() else LEGACY_SOURCE_JSON
+    source_file = SOURCE_JSON
     data = load_json(source_file)
     if not isinstance(data, list):
         raise RuntimeError(f"Expected list data in {source_file}")

@@ -1,7 +1,4 @@
 __pycache__/
 *.pyc
-x_bookmarks_sync.env
-knowledge_organizer.env
-web_capture_to_obsidian.env
 skills/url-to-obsidian/url_to_obsidian.env
 skills/x-bookmarks-to-obsidian/x_bookmarks_to_obsidian.env
