@@ -32,7 +32,7 @@ Talk to your agent in natural language:
 
 ## Agent Template
 
-Use [`overrides_prompt_template.md`](overrides_prompt_template.md) when the current session needs to turn exported JSON into overrides JSON before the final `generate` step.
+Use [`overrides_prompt_template.md`](overrides_prompt_template.md) when the current session needs to turn exported JSON into overrides JSON before the final `generate` step. The export step also writes an internal incremental-only JSON so the agent can analyze only newly added bookmarks.
 
 ## Output
 
@@ -93,7 +93,7 @@ OpenCode 的话，让 agent 把整个仓库 clone 到 skills 目录。
 
 ## Agent 模板
 
-需要当前会话把导出 JSON 整理成 overrides JSON 时，直接参考 [`overrides_prompt_template.md`](overrides_prompt_template.md)，再执行最后的 `generate` 阶段。
+需要当前会话把导出 JSON 整理成 overrides JSON 时，直接参考 [`overrides_prompt_template.md`](overrides_prompt_template.md)，再执行最后的 `generate` 阶段。导出阶段还会额外写出一个内部使用的、仅包含新增书签的 JSON，方便 agent 只分析真正的增量内容。
 
 ## 输出
 

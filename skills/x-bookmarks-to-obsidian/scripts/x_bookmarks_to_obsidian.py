@@ -247,6 +247,39 @@ def write_known_links(path: Path, links: Iterable[str]) -> int:
     return len(known)
 
 
+def load_export_items(path: Path) -> List[dict]:
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    return data if isinstance(data, list) else []
+
+
+def incremental_items(items: Iterable[dict], known_links: Iterable[str]) -> List[dict]:
+    known = {link for link in known_links if isinstance(link, str) and link}
+    out: List[dict] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        status_link = str(item.get("statusLink", "")).strip()
+        if not status_link or status_link in known:
+            continue
+        out.append(item)
+    return out
+
+
+def write_json_list(path: Path, items: List[dict]) -> int:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(items, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return len(items)
+
+
+def incremental_source_path(source_json: Path) -> Path:
+    return source_json.parent / "x-bookmarks-to-obsidian-incremental.json"
+
+
 def usage() -> str:
     script = Path(__file__).name
     return (
@@ -280,6 +313,7 @@ def main(argv: List[str]) -> int:
 
     dev_browser_tmp = env_path("X_BOOKMARKS_TO_OBSIDIAN_DEV_BROWSER_TMP", common_home() / ".dev-browser" / "tmp")
     source_json = env_path("X_BOOKMARKS_TO_OBSIDIAN_SOURCE_JSON", dev_browser_tmp / "x-bookmarks-to-obsidian-export.json")
+    incremental_source_json = incremental_source_path(source_json)
     overrides_file = env_path("X_BOOKMARKS_TO_OBSIDIAN_LLM_OVERRIDES_FILE", dev_browser_tmp / "x-bookmarks-to-obsidian-llm-overrides.json")
     known_links_file = env_path("X_BOOKMARKS_TO_OBSIDIAN_KNOWN_LINKS_FILE", dev_browser_tmp / "x-bookmarks-to-obsidian-known.json")
     state_file = resolve_state_file(target_dir)
@@ -296,6 +330,7 @@ def main(argv: List[str]) -> int:
         raise SystemExit("Nothing to do: both export and generate are disabled.")
 
     child_env = os.environ.copy()
+    known_links = load_known_links(state_file)
 
     if run_export:
         ensure_dev_browser()
@@ -303,7 +338,7 @@ def main(argv: List[str]) -> int:
         check_chrome_version(chrome_bin)
         endpoint = build_endpoint(resolve_devtools_file())
 
-        known_count = write_known_links(known_links_file, load_known_links(state_file))
+        known_count = write_known_links(known_links_file, known_links)
         if state_file.exists():
             print(f"Loaded {known_count} known bookmarks from {state_file}")
         else:
@@ -323,11 +358,17 @@ def main(argv: List[str]) -> int:
             env=child_env,
         )
 
+        exported_items = load_export_items(source_json)
+        new_items = incremental_items(exported_items, known_links)
+        new_count = write_json_list(incremental_source_json, new_items)
+        print(f"Prepared {new_count} incremental bookmarks for agent overrides at {incremental_source_json}")
+
     if run_generate:
         run_checked([sys.executable, str(GENERATE_SCRIPT)], env=child_env)
 
     if mode == "export" or (run_export and not run_generate):
         print(f"Exported X bookmarks to {source_json}")
+        print(f"Prepared incremental bookmarks at {incremental_source_json}")
         print(f"Write agent overrides to {overrides_file}")
     elif mode == "generate" or (run_generate and not run_export):
         print(f"Generated X bookmark notes into {target_dir}")

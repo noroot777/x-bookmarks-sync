@@ -20,27 +20,29 @@ Do not rely on the scripts to make a second LLM call on their own.
 
 1. Run export-only sync:
    - `python3 scripts/x_bookmarks_to_obsidian.py export`
-2. Read the exported JSON from:
-   - `X_BOOKMARKS_TO_OBSIDIAN_SOURCE_JSON`
+2. Read the incremental JSON first from the same directory as `X_BOOKMARKS_TO_OBSIDIAN_SOURCE_JSON`:
+   - default: `~/.dev-browser/tmp/x-bookmarks-to-obsidian-incremental.json`
+3. Use `X_BOOKMARKS_TO_OBSIDIAN_SOURCE_JSON` only as the current export window for merge context.
    - default: `~/.dev-browser/tmp/x-bookmarks-to-obsidian-export.json`
-3. In the current agent session, create higher-signal `title`, `summary`, and `tags` for the exported items.
-   - Keep one output entry per bookmark key.
-   - Reuse existing overrides when the file already exists.
-   - Only create or update entries for bookmarks present in the current export JSON.
-4. Write overrides to:
+4. In the current agent session, create higher-signal `title`, `summary`, and `tags` only for the incremental items.
+   - Keep one output entry per bookmark key in the current export window.
+   - Reuse existing overrides for known bookmarks that are still present in the current export window.
+   - Only create new LLM content for bookmarks present in the incremental JSON.
+   - If the incremental JSON is empty, skip LLM generation and go straight to `generate`.
+5. Write overrides to:
    - `X_BOOKMARKS_TO_OBSIDIAN_LLM_OVERRIDES_FILE`
    - default: `~/.dev-browser/tmp/x-bookmarks-to-obsidian-llm-overrides.json`
-5. Follow the JSON shape from:
+6. Follow the JSON shape from:
    - [`x_bookmarks_to_obsidian_llm_overrides.example.json`](x_bookmarks_to_obsidian_llm_overrides.example.json)
-6. Use the prompt template when writing overrides in the current session:
+7. Use the prompt template when writing overrides in the current session:
    - [`overrides_prompt_template.md`](overrides_prompt_template.md)
-7. Generate final notes:
+8. Generate final notes:
    - `python3 scripts/x_bookmarks_to_obsidian.py generate`
 
 ## Agent Rules
 
 - When the user asks to sync bookmarks, prefer the full agent-assisted flow instead of calling `python3 scripts/x_bookmarks_to_obsidian.py` in default full mode without overrides.
-- The current agent session is responsible for writing the overrides JSON.
+- The current agent session is responsible for writing the overrides JSON, but it should analyze only incremental bookmarks and reuse existing overrides for known items in the current export window.
 - If no overrides are needed, say that explicitly and then run the final generate step.
 - Keep summaries concrete and compact; do not add filler.
 
